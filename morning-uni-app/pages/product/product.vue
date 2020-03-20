@@ -5,7 +5,7 @@
 				<swiper-item class="swiper-item" v-for="(item,index) in imgList" :key="index">
 					<view class="image-wrapper">
 						<image
-							:src="item.src" 
+							:src="item.showImg" 
 							class="loaded" 
 							mode="aspectFill"
 						></image>
@@ -15,17 +15,18 @@
 		</view>
 		
 		<view class="introduce-section">
-			<text class="title">恒源祥2019春季长袖白色t恤 新款春装</text>
+			<text class="title">{{product.title}}</text>
 			<view class="price-box">
 				<text class="price-tip">¥</text>
-				<text class="price">341.6</text>
-				<text class="m-price">¥488</text>
-				<text class="coupon-tip">7折</text>
+				<text class="price">{{product.price}}</text>
+				<text class="m-price">{{product.discountPrice}}</text>
+				<text class="coupon-tip" v-if="product.discount">{{product.discount}}</text>
+				<text class="m-score">{{product.score}}积分</text>
 			</view>
 			<view class="bot-row">
-				<text>销量: 108</text>
-				<text>库存: 4690</text>
-				<text>浏览量: 768</text>
+				<text>销量: {{product.salesVolume}}</text>
+				<text>库存: {{product.stock}}</text>
+				<text>浏览量: {{product.pageViewNum}}</text>
 			</view>
 		</view>
 		
@@ -62,17 +63,17 @@
 			<view class="c-row b-b">
 				<text class="tit">促销活动</text>
 				<view class="con-list">
-					<text>新人首单送20元无门槛代金券</text>
-					<text>订单满50减10</text>
-					<text>订单满100减30</text>
-					<text>单笔购买满两件免邮费</text>
+					<text class="selected-text" v-for="(cItem, cIndex) in couponList" :key="cIndex">
+						{{cItem.title}}
+					</text>
 				</view>
 			</view>
 			<view class="c-row b-b">
 				<text class="tit">服务</text>
 				<view class="bz-list con">
-					<text>7天无理由退换货 ·</text>
-					<text>假一赔十 ·</text>
+					<text v-for="(vItem, vIndex) in productVouchList" :key="vIndex">
+						{{vItem.title}} ·
+					</text>
 				</view>
 			</view>
 		</view>
@@ -81,18 +82,18 @@
 		<view class="eva-section">
 			<view class="e-header">
 				<text class="tit">评价</text>
-				<text>(86)</text>
-				<text class="tip">好评率 100%</text>
+				<text>({{conmment.totalCount}})</text>
+				<text class="tip">好评率 {{conmment.goodRate}}%</text>
 				<text class="yticon icon-you"></text>
 			</view> 
-			<view class="eva-box">
-				<image class="portrait" src="http://img3.imgtn.bdimg.com/it/u=1150341365,1327279810&fm=26&gp=0.jpg" mode="aspectFill"></image>
+			<view class="eva-box" v-for="(cItem, cIndex) in conmment.conmmentList" :key="cIndex">
+				<image class="portrait" :src="cItem.headImg" mode="aspectFill"></image>
 				<view class="right">
-					<text class="name">Leo yo</text>
-					<text class="con">商品收到了，79元两件，质量不错，试了一下有点瘦，但是加个外罩很漂亮，我很喜欢</text>
+					<text class="name">{{cItem.userName}}</text>
+					<text class="con">{{cItem.content}}</text>
 					<view class="bot">
-						<text class="attr">购买类型：XL 红色</text>
-						<text class="time">2019-04-01 19:21</text>
+						<text class="attr">购买类型：{{cItem.buyType}}</text>
+						<text class="time">{{cItem.createTime}}</text>
 					</view>
 				</view>
 			</view>
@@ -177,6 +178,7 @@
 </template>
 
 <script>
+	import Api from '@/common/api';
 	import share from '@/components/share';
 	export default{
 		components: {
@@ -187,95 +189,38 @@
 				specClass: 'none',
 				specSelected:[],
 				
+				product:{},	
 				favorite: true,
 				shareList: [],
-				imgList: [
-					{
-						src: 'https://gd3.alicdn.com/imgextra/i3/0/O1CN01IiyFQI1UGShoFKt1O_!!0-item_pic.jpg_400x400.jpg'
-					},
-					{
-						src: 'https://gd3.alicdn.com/imgextra/i3/TB1RPFPPFXXXXcNXpXXXXXXXXXX_!!0-item_pic.jpg_400x400.jpg'
-					},
-					{
-						src: 'https://gd2.alicdn.com/imgextra/i2/38832490/O1CN01IYq7gu1UGShvbEFnd_!!38832490.jpg_400x400.jpg'
-					}
-				],
-				desc: `
-					<div style="width:100%">
-						<img style="width:100%;display:block;" src="https://gd3.alicdn.com/imgextra/i4/479184430/O1CN01nCpuLc1iaz4bcSN17_!!479184430.jpg_400x400.jpg" />
-						<img style="width:100%;display:block;" src="https://gd2.alicdn.com/imgextra/i2/479184430/O1CN01gwbN931iaz4TzqzmG_!!479184430.jpg_400x400.jpg" />
-						<img style="width:100%;display:block;" src="https://gd3.alicdn.com/imgextra/i3/479184430/O1CN018wVjQh1iaz4aupv1A_!!479184430.jpg_400x400.jpg" />
-						<img style="width:100%;display:block;" src="https://gd4.alicdn.com/imgextra/i4/479184430/O1CN01tWg4Us1iaz4auqelt_!!479184430.jpg_400x400.jpg" />
-						<img style="width:100%;display:block;" src="https://gd1.alicdn.com/imgextra/i1/479184430/O1CN01Tnm1rU1iaz4aVKcwP_!!479184430.jpg_400x400.jpg" />
-					</div>
-				`,
-				specList: [
-					{
-						id: 1,
-						name: '尺寸',
-					},
-					{	
-						id: 2,
-						name: '颜色',
-					},
-				],
-				specChildList: [
-					{
-						id: 1,
-						pid: 1,
-						name: 'XS',
-					},
-					{
-						id: 2,
-						pid: 1,
-						name: 'S',
-					},
-					{
-						id: 3,
-						pid: 1,
-						name: 'M',
-					},
-					{
-						id: 4,
-						pid: 1,
-						name: 'L',
-					},
-					{
-						id: 5,
-						pid: 1,
-						name: 'XL',
-					},
-					{
-						id: 6,
-						pid: 1,
-						name: 'XXL',
-					},
-					{
-						id: 7,
-						pid: 2,
-						name: '白色',
-					},
-					{
-						id: 8,
-						pid: 2,
-						name: '珊瑚粉',
-					},
-					{
-						id: 9,
-						pid: 2,
-						name: '草木绿',
-					},
-				]
+				imgList: [],
+				desc:'',
+				specList: [],
+				specChildList: [],
+				couponList: [],
+				productVouchList: [],
+				conmment: {}
 			};
 		},
 		async onLoad(options){
-			
 			//接收传值,id里面放的是标题，因为测试数据并没写id 
-			let id = options.id;
-			if(id){
-				this.$api.msg(`点击了${id}`);
+			let productId = options.productId;
+			if(productId){
+				this.$api.msg(`点击了${productId}`);
 			}
+			// 调用接口加载商品详情
+			let productDetail = await Api.apiCall('get', 'product-service/product/productDetail?productId='+productId);
+			console.log("商品详情:"+JSON.stringify(productDetail));
+			// 商品描述信息
+			this.product=productDetail.product;
 			
+			// console.log("商品图片信息:"+JSON.stringify(this.imgList));
+			this.imgList = productDetail.productImgList;
+			// 拼接描述html信息
+			this.appendDesc();
+			// 规格组
+			this.specList = productDetail.specGroupList;
+			// 规格参数
+			this.specChildList = productDetail.specParamList;
 			
 			//规格 默认选中第一条
 			this.specList.forEach(item=>{
@@ -286,7 +231,19 @@
 						break; //forEach不能使用break
 					}
 				}
-			})
+			});
+			
+			// 优惠券
+			this.couponList=productDetail.couponList;
+			// 商品保证
+			this.productVouchList=productDetail.productVouchList;
+			
+			// 加载商品评论
+			let commentData = await Api.apiCall('get', 'product-service/comment/queryComment?productId='+productId);
+			console.log("商品评论:"+JSON.stringify(commentData));
+			this.conmment=commentData;
+			
+			// 分享信息直接前端写死
 			this.shareList = await this.$api.json('shareList');
 		},
 		methods:{
@@ -337,6 +294,14 @@
 				uni.navigateTo({
 					url: `/pages/order/createOrder`
 				})
+			},
+			appendDesc(){
+				let list = this.imgList;
+				let text='';
+				for (var i = 0; i < list.length; i++) { 
+				    text += '<img style="width:100%;display:block;" src="'+list[i].showImg+'" />';
+				}
+				this.desc='<div style="width:100%">'+text+'</div>';
 			},
 			stopPrevent(){}
 		},
@@ -413,6 +378,11 @@
 			border-radius: 6upx;
 			line-height: 1;
 			transform: translateY(-4upx); 
+		}
+		.m-score{
+			margin:0 12upx;
+			color: $font-color-light;
+			text-decoration: line-through;
 		}
 		.bot-row{
 			display:flex;
