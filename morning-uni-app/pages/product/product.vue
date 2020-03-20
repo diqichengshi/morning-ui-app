@@ -123,7 +123,7 @@
 			
 			<view class="action-btn-group">
 				<button type="primary" class=" action-btn no-border buy-now-btn" @click="buy">立即购买</button>
-				<button type="primary" class=" action-btn no-border add-cart-btn">加入购物车</button>
+				<button type="primary" class=" action-btn no-border add-cart-btn" @click="addCart">加入购物车</button>
 			</view>
 		</view>
 		
@@ -294,6 +294,29 @@
 				uni.navigateTo({
 					url: `/pages/order/createOrder`
 				})
+			},
+			addCart(){
+				// 获取本地存储的信息token,userId
+				const token=uni.getStorageSync('token');
+				const userId=uni.getStorageSync('userId');
+				if(token && userId){
+					let data = {
+						'token': token,
+						'userId': userId,
+						'num': 1,
+						'productId': this.productId
+					};
+					let cartData = Api.apiCall('post', 'product-service/comment/queryComment',data);
+					console.log('添加购物车结果:'+cartData);
+				}else{
+					uni.showToast({
+						title: '请先登录',
+						icon: 'none'
+					});
+					uni.navigateTo({
+						url: `/pages/login/login`
+					});
+				}
 			},
 			appendDesc(){
 				let list = this.imgList;

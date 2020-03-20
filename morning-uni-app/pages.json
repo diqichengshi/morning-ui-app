@@ -177,6 +177,13 @@
 				"navigationBarTitleText": "商品列表"
 			}
         }
+		,{
+		    "path" : "pages/login/login",
+		    "style" : {
+				"enablePullDownRefresh": true,
+				"navigationBarTitleText": "登录"
+			}
+		}
     ],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
