@@ -55,7 +55,7 @@
 				</view>
 				<text class="yticon icon-you"></text>
 			</view>
-			<view class="c-row b-b">
+			<view class="c-row b-b" @click="toggleMask('show')">
 				<text class="tit">优惠券</text>
 				<text class="con t-r red">领取优惠券</text>
 				<text class="yticon icon-you"></text>
@@ -64,7 +64,7 @@
 				<text class="tit">促销活动</text>
 				<view class="con-list">
 					<text class="selected-text" v-for="(cItem, cIndex) in couponList" :key="cIndex">
-						{{cItem.title}}
+						{{cItem.desc}}
 					</text>
 				</view>
 			</view>
@@ -136,13 +136,13 @@
 			@click="toggleSpec"
 		>
 			<!-- 遮罩层 -->
-			<view class="mask"></view>
+			<!-- <view class="mask"></view> -->
 			<view class="layer attr-content" @click.stop="stopPrevent">
 				<view class="a-t">
 					<image src="https://gd3.alicdn.com/imgextra/i3/0/O1CN01IiyFQI1UGShoFKt1O_!!0-item_pic.jpg_400x400.jpg"></image>
 					<view class="right">
-						<text class="price">¥328.00</text>
-						<text class="stock">库存：188件</text>
+						<text class="price">¥{{product.price}}</text>
+						<text class="stock">库存：{{product.stock}}件</text>
 						<view class="selected">
 							已选：
 							<text class="selected-text" v-for="(sItem, sIndex) in specSelected" :key="sIndex">
@@ -168,6 +168,12 @@
 				<button class="btn" @click="toggleSpec">完成</button>
 			</view>
 		</view>
+		<!-- 优惠券面板 -->
+		<view class="mask" :class="maskState===0 ? 'none' : maskState===1 ? 'show' : ''" @click="toggleMask">
+			<view class="mask-content" @click.stop.prevent="stopPrevent">
+				<coupon v-for="(item, index) in couponList" :key="index" v-bind:item="item" theme="#ff0000"></coupon>
+			</view>
+		</view>
 		<!-- 分享 -->
 		<share 
 			ref="share" 
@@ -180,15 +186,21 @@
 <script>
 	import Api from '@/common/api';
 	import share from '@/components/share';
+	import coupon from '@/pages/coupon/coupon';
+
 	export default{
 		components: {
-			share
+			share, coupon	
 		},
 		data() {
 			return {
 				specClass: 'none',
 				specSelected:[],
+				selectSpecParamIds: '',
+				maskState: 0, //优惠券面板显示状态
 				
+				productId:'',	
+				skuId:'',	
 				product:{},	
 				favorite: true,
 				shareList: [],
@@ -198,18 +210,21 @@
 				specChildList: [],
 				couponList: [],
 				productVouchList: [],
+				productSkuList:[],
 				conmment: {}
 			};
 		},
 		async onLoad(options){
 			//接收传值,id里面放的是标题，因为测试数据并没写id 
 			let productId = options.productId;
+			// 保存商品id
+			this.productId=options.productId;
 			if(productId){
 				this.$api.msg(`点击了${productId}`);
 			}
 			// 调用接口加载商品详情
-			let productDetail = await Api.apiCall('get', 'product-service/product/productDetail?productId='+productId);
-			console.log("商品详情:"+JSON.stringify(productDetail));
+			let productDetail = await Api.httpGet('product-service/product/productDetail?productId='+productId);
+			// console.log("商品详情:"+JSON.stringify(productDetail));
 			// 商品描述信息
 			this.product=productDetail.product;
 			
@@ -221,7 +236,8 @@
 			this.specList = productDetail.specGroupList;
 			// 规格参数
 			this.specChildList = productDetail.specParamList;
-			
+			// sku列表
+			this.productSkuList=productDetail.productSkuList;
 			//规格 默认选中第一条
 			this.specList.forEach(item=>{
 				for(let cItem of this.specChildList){
@@ -232,22 +248,38 @@
 					}
 				}
 			});
-			
-			// 优惠券
-			this.couponList=productDetail.couponList;
+			// 保存选中的商品规格参数
+			this.changeSelectProductSku();
 			// 商品保证
 			this.productVouchList=productDetail.productVouchList;
-			
 			// 加载商品评论
-			let commentData = await Api.apiCall('get', 'product-service/comment/queryComment?productId='+productId);
-			console.log("商品评论:"+JSON.stringify(commentData));
+			
+			let commentData = await Api.httpGet('product-service/comment/queryComment?productId='+productId);
+			// console.log("商品评论:"+JSON.stringify(commentData));
 			this.conmment=commentData;
+			// 加载优惠券
+			let shopId=this.product.shopId;
+			let param={
+				shopId:this.product.shopId,
+				productId:this.product.productId
+			}
+			console.log('优惠券请求参数'+JSON.stringify(param));
+			let couponData = await Api.httpPost('coupon-service/coupon/queryTemplate',JSON.stringify(param));
+			couponData.forEach(item=>{
+				if(item.status === '1'){ 
+					item.showMsg='已领取'; 
+				} else{
+					item.showMsg='立即领取';
+				}
+			});
+			console.log('优惠券信息返回'+JSON.stringify(couponData));
+			this.couponList=couponData;
 			
 			// 分享信息直接前端写死
 			this.shareList = await this.$api.json('shareList');
 		},
 		methods:{
-			//规格弹窗开关
+			// 规格弹窗开关
 			toggleSpec() {
 				if(this.specClass === 'show'){
 					this.specClass = 'hide';
@@ -279,8 +311,18 @@
 					if(item.selected === true){ 
 						this.specSelected.push(item); 
 					} 
-				})
-				
+				});
+				// 保存选中的商品规格参数
+				this.changeSelectProductSku();
+			},
+			//显示优惠券面板
+			toggleMask(type){
+				let timer = type === 'show' ? 10 : 300;
+				let	state = type === 'show' ? 1 : 0;
+				this.maskState = 2;
+				setTimeout(()=>{
+					this.maskState = state;
+				}, timer)
 			},
 			//分享
 			share(){
@@ -291,23 +333,76 @@
 				this.favorite = !this.favorite;
 			},
 			buy(){
-				uni.navigateTo({
-					url: `/pages/order/createOrder`
+				let list = this.cartList;
+				let goodsData = [];
+				goodsData.push({
+					shopId:this.product.shopId,
+					productId:this.productId,
+					skuId:this.skuId,
+					title:this.product.title,
+					showImg:btoa(this.product.showImg),
+					price:this.product.price,
+					number: this.product.number,
+					specParamVal: this.product.specParamVal
 				})
+				let param={
+					'userId':uni.getStorageSync('userId'),
+					'totalPrice': this.totalPrice,
+					'totalDiscount': this.totalDiscount,
+					'productList': goodsData
+				}
+				console.log('预创建请求数据:' + JSON.stringify(param));
+				// 请求后台进行登录
+				uni.request({
+					url: Api.BASEURI + 'order-service/order/create',
+					method: 'POST',
+					data: param,
+					header: {
+						'content-type': 'application/json',
+					},
+					success: res => {
+						// 接口调用成功
+						console.log('预创建返回数据:' + JSON.stringify(res.data));
+						if (res.data.code == 200) {
+							let orderId=res.data.data;
+							/* let data=JSON.stringify({goodsData: goodsData}) */;
+							// 创建成功
+							uni.navigateTo({
+								url: `/pages/order/createOrder?orderId=${orderId}`
+							})
+							this.$api.msg('跳转下一页 sendData');
+						} else {
+							uni.showToast({
+								title: res.data.message,
+								icon: 'none'
+							});
+						}
+					},
+					fail: (e) => {
+						console.log('接口' + endpoint + '请求失败:' + JSON.stringify(e));
+					},
+					complete: () => {}
+				});
+				// uni请求结束
+				/* uni.navigateTo({
+					url: `/pages/order/createOrder`
+				}) */
 			},
 			addCart(){
 				// 获取本地存储的信息token,userId
 				const token=uni.getStorageSync('token');
 				const userId=uni.getStorageSync('userId');
+				// 已登录,添加购物车
 				if(token && userId){
-					let data = {
+					let param = {
 						'token': token,
 						'userId': userId,
-						'num': 1,
-						'productId': this.productId
+						'number': 1,
+						'productId': this.productId,
+						'specParamIds': this.selectSpecParamIds
 					};
-					let cartData = Api.apiCall('post', 'product-service/comment/queryComment',data);
-					console.log('添加购物车结果:'+cartData);
+					console.log('添加请求参数:'+JSON.stringify(param));
+					Api.httpPost('order-service/cart/addCart',param);
 				}else{
 					uni.showToast({
 						title: '请先登录',
@@ -318,10 +413,27 @@
 					});
 				}
 			},
+			changeSelectProductSku(){
+				let ids='';
+				this.specSelected.forEach(item=>{
+					ids+=item.id+',';
+				});
+				ids=(ids.substring(ids.length-1)==',')?ids.substring(0,ids.length-1):ids;
+				this.selectSpecParamIds=ids;
+				// console.log('选择了规格参数:'+this.selectSpecParamIds);
+				this.productSkuList.forEach(item=>{
+					if(item.specParamPath==ids){
+						this.skuId=item.skuId;
+						this.product.price=item.price;
+						this.product.stock=item.stock;
+						console.log('选择了规格参数:'+this.selectSpecParamIds+' skuId:'+this.skuId);
+					}
+				});
+			},
 			appendDesc(){
 				let list = this.imgList;
 				let text='';
-				for (var i = 0; i < list.length; i++) { 
+				for (var i = 0; i < 3; i++) { 
 				    text += '<img style="width:100%;display:block;" src="'+list[i].showImg+'" />';
 				}
 				this.desc='<div style="width:100%">'+text+'</div>';
@@ -829,6 +941,119 @@
 				padding: 0;
 				border-radius: 0;
 				background: transparent;
+			}
+		}
+	}
+	
+	/* 优惠券面板 */
+	.mask{
+		display: flex;
+		align-items: flex-end;
+		position: fixed;
+		left: 0;
+		top: var(--window-top);
+		bottom: 0;
+		width: 100%;
+		background: rgba(0,0,0,0);
+		z-index: 9995;
+		transition: .3s;
+		
+		.mask-content{
+			width: 100%;
+			min-height: 50vh;
+			max-height: 70vh;
+			background: #f3f3f3;
+			transform: translateY(100%);
+			transition: .3s;
+			overflow-y:scroll;
+		}
+		&.none{
+			display: none;
+		}
+		&.show{
+			background: rgba(0,0,0,.4);
+			
+			.mask-content{
+				transform: translateY(0);
+			}
+		}
+	}
+	
+	/* 优惠券列表 */
+	.coupon-item{
+		display: flex;
+		flex-direction: column;
+		margin: 20upx 24upx;
+		background: #fff;
+		.con{
+			display: flex;
+			align-items: center;
+			position: relative;
+			height: 120upx;
+			padding: 0 30upx;
+			&:after{
+				position: absolute;
+				left: 0;
+				bottom: 0;
+				content: '';
+				width: 100%;
+				height: 0;
+				border-bottom: 1px dashed #f3f3f3;
+				transform: scaleY(50%);
+			}
+		}
+		.left{
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			flex: 1;
+			overflow: hidden;
+			height: 100upx;
+		}
+		.title{
+			font-size: 32upx;
+			color: $font-color-dark;
+			margin-bottom: 10upx;
+		}
+		.time{
+			font-size: 24upx;
+			color: $font-color-light;
+		}
+		.right{
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+			font-size: 26upx;
+			color: $font-color-base;
+			height: 100upx;
+		}
+		.price{
+			font-size: 44upx;
+			color: $base-color;
+			&:before{
+				content: '￥';
+				font-size: 34upx;
+			}
+		}
+		.tips{
+			font-size: 24upx;
+			color: $font-color-light;
+			line-height: 60upx;
+			padding-left: 30upx;
+		}
+		.circle{
+			position: absolute;
+			left: -6upx;
+			bottom: -10upx;
+			z-index: 10;
+			width: 20upx;
+			height: 20upx;
+			background: #f3f3f3;
+			border-radius: 100px;
+			&.r{
+				left: auto;
+				right: -6upx;
 			}
 		}
 	}

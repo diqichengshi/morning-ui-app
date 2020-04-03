@@ -9,7 +9,7 @@
 						<text class="name">{{addressData.name}}</text>
 						<text class="mobile">{{addressData.mobile}}</text>
 					</view>
-					<text class="address">{{addressData.address}} {{addressData.area}}</text>
+					<text class="address">{{addressData.address}} {{addressData.userAdress}}</text>
 				</view>
 				<text class="yticon icon-you"></text>
 			</view>
@@ -23,25 +23,20 @@
 				<text class="name">西城小店铺</text>
 			</view>
 			<!-- 商品列表 -->
-			<view class="g-item">
-				<image src="https://ss2.bdstatic.com/70cFvnSh_Q1YnxGkpoWK1HF6hhy/it/u=756705744,3505936868&fm=11&gp=0.jpg"></image>
+			<view class="g-item" v-for="(item, index) in cartList" :key="item.cartId">
+				<image :src="item.showImg"
+					:class="[item.loaded]"
+					mode="aspectFill" 
+					lazy-load 
+					@load="onImageLoad('cartList', index)" 
+					@error="onImageError('cartList', index)"
+				></image>
 				<view class="right">
-					<text class="title clamp">古黛妃 短袖t恤女夏装2019新款</text>
-					<text class="spec">春装款 L</text>
+					<text class="title clamp">{{item.title}}</text>
+					<text class="spec">{{item.specParamVal}}</text>
 					<view class="price-box">
-						<text class="price">￥17.8</text>
-						<text class="number">x 1</text>
-					</view>
-				</view>
-			</view>
-			<view class="g-item">
-				<image src="https://ss0.bdstatic.com/70cFvHSh_Q1YnxGkpoWK1HF6hhy/it/u=1620020012,789258862&fm=26&gp=0.jpg"></image>
-				<view class="right">
-					<text class="title clamp">韩版于是洞洞拖鞋 夏季浴室防滑简约居家【新人专享，限选意见】</text>
-					<text class="spec">春装款 L</text>
-					<view class="price-box">
-						<text class="price">￥17.8</text>
-						<text class="number">x 1</text>
+						<text class="price">￥{{item.price}}</text>
+						<text class="number">x {{item.number}}</text>
 					</view>
 				</view>
 			</view>
@@ -71,11 +66,11 @@
 		<view class="yt-list">
 			<view class="yt-list-cell b-b">
 				<text class="cell-tit clamp">商品金额</text>
-				<text class="cell-tip">￥179.88</text>
+				<text class="cell-tip">￥{{totalPrice}}</text>
 			</view>
 			<view class="yt-list-cell b-b">
 				<text class="cell-tit clamp">优惠金额</text>
-				<text class="cell-tip red">-￥35</text>
+				<text class="cell-tip red">-￥{{totalDiscount}}</text>
 			</view>
 			<view class="yt-list-cell b-b">
 				<text class="cell-tit clamp">运费</text>
@@ -92,7 +87,7 @@
 			<view class="price-content">
 				<text>实付款</text>
 				<text class="price-tip">￥</text>
-				<text class="price">475</text>
+				<text class="price">{{totalPay}}</text>
 			</view>
 			<text class="submit" @click="submit">提交订单</text>
 		</view>
@@ -100,23 +95,8 @@
 		<!-- 优惠券面板 -->
 		<view class="mask" :class="maskState===0 ? 'none' : maskState===1 ? 'show' : ''" @click="toggleMask">
 			<view class="mask-content" @click.stop.prevent="stopPrevent">
-				<!-- 优惠券页面，仿mt -->
-				<view class="coupon-item" v-for="(item,index) in couponList" :key="index">
-					<view class="con">
-						<view class="left">
-							<text class="title">{{item.title}}</text>
-							<text class="time">有效期至2019-06-30</text>
-						</view>
-						<view class="right">
-							<text class="price">{{item.price}}</text>
-							<text>满30可用</text>
-						</view>
-						
-						<view class="circle l"></view>
-						<view class="circle r"></view>
-					</view>
-					<text class="tips">限新用户使用</text>
-				</view>
+				<coupon v-for="(item, index) in couponList" :key="index" types="carts" v-bind:item="item"
+				  @transferCoupon="settleCoupon" theme="#ff0000"></coupon>
 			</view>
 		</view>
 
@@ -124,42 +104,95 @@
 </template>
 
 <script>
+	import Api from '@/common/api';
+	import coupon from '@/pages/coupon/coupon';
 	export default {
+		components: {
+			coupon	
+		},
 		data() {
 			return {
 				maskState: 0, //优惠券面板显示状态
 				desc: '', //备注
 				payType: 1, //1微信 2支付宝
-				couponList: [
-					{
-						title: '新用户专享优惠券',
-						price: 5,
-					},
-					{
-						title: '庆五一发一波优惠券',
-						price: 10,
-					},
-					{
-						title: '优惠券优惠券优惠券优惠券',
-						price: 15,
-					}
-				],
-				addressData: {
-					name: '许小星',
-					mobile: '13853989563',
-					addressName: '金九大道',
-					address: '山东省济南市历城区',
-					area: '149号',
-					default: false,
-				}
+				couponList: [],
+				addressData: {},
+				orderId:'',
+				totalPrice:'',
+				totalDiscount:'',
+				totalPay:'',
+				cartList: [],
+				productList: [],
+				alreadyUseCoupon:[]
 			}
 		},
 		onLoad(option){
+			// 订单号
+			this.orderId=option.orderId;
+			console.log(option.orderId);
+			
 			//商品数据
-			//let data = JSON.parse(option.data);
-			//console.log(data);
+			/* let data = JSON.parse(option.data);
+			// console.log(data);
+			// 遍历商品信息
+			data.goodsData.forEach(item=>{
+				this.cartList.push({
+					cartId:item.cartId,
+					skuId:item.skuId,
+					title:item.title,
+					showImg:atob(item.showImg),
+					price:item.price,
+					number: item.number,
+					specParamVal: item.specParamVal
+				})
+				//---------------
+			}); */
+			// console.log('创建的订单的商品信息'+JSON.stringify(this.cartList));
+			this.loadData();
 		},
 		methods: {
+			//请求数据
+			async loadData(){
+				// 调用接口加载商品详情
+				let userId=uni.getStorageSync('userId');
+				let queryAddressData = await Api.httpGet('user-service/address/queryAddress?userId='+userId);
+				this.addressData = queryAddressData;
+				// console.log('加载'+userId+'的收货地址信息'+JSON.stringify(this.addressData));
+				
+				// 加载预创建订单详情
+				let orderId=this.orderId;
+				let preOrderDetail = await Api.httpGet('order-service/order/preOrderDetail?userId='+userId+'&orderId='+orderId);
+				console.log('加载'+userId+'的预创建订单信息'+JSON.stringify(preOrderDetail));
+				this.productList = preOrderDetail.cartProductList;
+				this.totalPrice = preOrderDetail.totalPrice;
+				this.totalDiscount = preOrderDetail.totalDiscount;
+				this.totalPay=preOrderDetail.totalPrice-preOrderDetail.totalDiscount;
+				// 加载购物券列表
+				let userCouponList = await Api.httpGet('coupon-service/coupon/userCouponList?userId='+userId);
+				console.log('加载'+userId+'购物券信息'+JSON.stringify(userCouponList));
+				
+				userCouponList.forEach(item=>{
+					if(item.status === '2'){ 
+						item.showMsg='已使用'; 
+					} else{
+						item.showMsg='立即使用';
+					}
+				});
+				this.couponList = userCouponList;
+			},
+			settleCoupon(code){
+				console.log('选择了'+code);
+				this.alreadyUseCoupon.push(code);
+				console.log('购物券信息'+JSON.stringify(this.couponList));
+			},
+			//监听image加载完成
+			onImageLoad(key, index) {
+				this.$set(this[key][index], 'loaded', 'loaded');
+			},
+			//监听image加载失败
+			onImageError(key, index) {
+				this[key][index].image = '/static/errorImage.jpg';
+			},
 			//显示优惠券面板
 			toggleMask(type){
 				let timer = type === 'show' ? 10 : 300;
@@ -499,7 +532,7 @@
 		
 		.mask-content{
 			width: 100%;
-			min-height: 30vh;
+			min-height: 50vh;
 			max-height: 70vh;
 			background: #f3f3f3;
 			transform: translateY(100%);

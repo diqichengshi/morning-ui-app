@@ -1,18 +1,15 @@
 import store from '../store/index';
 export default {
 
-	BASEURI: 'http://localhost:8081/api/trans-gateway/',
-	// BASEURI:'http://localhost:8081/api/',
-	ESURI: 'http://localhost:8081/api/api/trans-gateway/',
-
+	BASEURI: 'http://192.168.56.105:8081/api/trans-gateway/',
+	// BASEURI: 'http://localhost:8081/api/trans-gateway/',
 	/**
 	 * 封装请求（async await 封装uni.request）
-	 * method	   post/get
 	 * endpoint    接口方法名
 	 * data		   所需传递参数
 	 * load		   是否需要loading
 	 */
-	async apiCall(method, endpoint, data, load) {
+	async httpGet(endpoint, data, load) {
 		if (!load) {
 			uni.showLoading({
 				title: '请稍候',
@@ -24,14 +21,14 @@ export default {
 		const userToken = uni.getStorageSync('userToken');
 		const userInfo = uni.getStorageSync('userInfo');
 		if (userInfo) {
-			// data.memberId = userInfo.id;
+			data.userId = userInfo.userId;
 			Authorization = userToken;
 		}
 
 		let [error, res] = await uni.request({
 			url: fullurl,
 			data: data,
-			method: method,
+			method: 'get',
 			header: {
 				'storeid': 3,
 				'Content-Type': 'application/x-www-form-urlencoded',
@@ -43,6 +40,7 @@ export default {
 			uni.hideLoading();
 		}
 
+		// console.log('请求地址:'+fullurl);
 		// console.log(res.data);
 		
 		if (res.data.message == '请先登录' || res.data.code == 100) {
@@ -56,10 +54,10 @@ export default {
 		}
 
 		if (res.data.code == 200) {
-			console.log('接口'+endpoint+'请求成功');
-			return res.data.result;
+			// console.log('接口'+endpoint+'请求成功');
+			return res.data.data;
 		} else {
-			console.log('接口'+endpoint+'请求失败:'+res.data.message);
+			// console.log('接口'+endpoint+'请求失败:'+res.data.message);
 			uni.showToast({
 				title: res.data.message,
 				icon: 'none'
@@ -68,44 +66,61 @@ export default {
 	},
 	/**
 	 * 封装请求（async await 封装uni.request）
-	 * method	   post/get
 	 * endpoint    接口方法名
 	 * data		   所需传递参数
 	 * load		   是否需要loading
 	 */
-	async apiEsCall(method, endpoint, data, load) {
+	async httpPost(endpoint, data, load) {
 		if (!load) {
 			uni.showLoading({
 				title: '请稍候',
 				mask: true
 			});
 		}
-
 		let fullurl = this.BASEURI + endpoint;
 		let Authorization;
 		const userToken = uni.getStorageSync('userToken');
 		const userInfo = uni.getStorageSync('userInfo');
 		if (userInfo) {
-			data.memberId = userInfo.id;
+			data.userId = userInfo.userId;
 			Authorization = userToken;
-
 		}
+	
 		let [error, res] = await uni.request({
 			url: fullurl,
 			data: data,
-			method: method,
+			method: 'post',
 			header: {
-				'storeId': 1,
-				'Content-Type': 'application/x-www-form-urlencoded',
-				// 'content-type': 'application/json',
-				'Authorization': Authorization || ''
+				'storeid': 3,
+				'content-type': 'application/json',
 			},
 		});
-		console.log(error);
 		if (!load) {
 			uni.hideLoading();
 		}
-		return res;
-
-	},
+	
+		console.log(res.data);
+		
+		if (res.data.message == '请先登录' || res.data.code == 100) {
+			uni.showToast({
+				title: '请先登录',
+				icon: 'none'
+			});
+			uni.navigateTo({
+				url: `/pages/login/login`
+			})
+		}
+	
+		if (res.data.code == 200) {
+			// console.log('接口'+endpoint+'请求成功:'+JSON.stringify(res.data));
+			return res.data.data;
+		} else {
+			// console.log('接口'+endpoint+'请求失败:'+res.data.message);
+			uni.showToast({
+				title: res.data.message,
+				icon: 'none'
+			});
+		}
+	}
+	
 }

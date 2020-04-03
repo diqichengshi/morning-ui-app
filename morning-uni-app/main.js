@@ -34,6 +34,7 @@ const json = type=>{
 const prePage = ()=>{
 	let pages = getCurrentPages();
 	let prePage = pages[pages.length - 2];
+	// let preParam = prePage.options || prePage.$route.query; // 当前页面参数
 	// #ifdef H5
 	return prePage;
 	// #endif

@@ -21,7 +21,7 @@
 						:class="{'b-b': index!==cartList.length-1}"
 					>
 						<view class="image-wrapper">
-							<image :src="item.image" 
+							<image :src="item.showImg" 
 								:class="[item.loaded]"
 								mode="aspectFill" 
 								lazy-load 
@@ -36,7 +36,7 @@
 						</view>
 						<view class="item-right">
 							<text class="clamp title">{{item.title}}</text>
-							<text class="attr">{{item.attr_val}}</text>
+							<text class="attr">{{item.specParamVal}}</text>
 							<text class="price">¥{{item.price}}</text>
 							<uni-number-box 
 								class="step"
@@ -66,10 +66,10 @@
 					</view>
 				</view>
 				<view class="total-box">
-					<text class="price">¥{{total}}</text>
+					<text class="price">¥{{totalPrice}}</text>
 					<text class="coupon">
 						已优惠
-						<text>74.35</text>
+						<text>{{totalDiscount}}</text>
 						元
 					</text>
 				</view>
@@ -80,9 +80,7 @@
 </template>
 
 <script>
-	import {
-		mapState
-	} from 'vuex';
+	import Api from '@/common/api';
 	import uniNumberBox from '@/components/uni-number-box.vue'
 	export default {
 		components: {
@@ -90,7 +88,9 @@
 		},
 		data() {
 			return {
-				total: 0, //总价格
+				hasLogin: false,
+				totalPrice: 0, //总价格
+				totalDiscount: 0, // 总优惠金额
 				allChecked: false, //全选状态  true|false
 				empty: false, //空白页现实  true|false
 				cartList: [],
@@ -108,19 +108,23 @@
 				}
 			}
 		},
-		computed:{
-			...mapState(['hasLogin'])
-		},
+		computed:{},
 		methods: {
 			//请求数据
 			async loadData(){
-				let list = await this.$api.json('cartList'); 
-				let cartList = list.map(item=>{
-					item.checked = true;
-					return item;
-				});
-				this.cartList = cartList;
-				this.calcTotal();  //计算总价
+				const userId = uni.getStorageSync('userId');
+				if(null == userId){
+					console.log('用户未登录');
+				}else{
+					// 调用接口加载商品详情
+					let cartData = await Api.httpGet('order-service/cart/cartList?userId='+userId);
+					console.log('初始化加载的购物车信息:'+JSON.stringify(cartData));
+					this.cartList = cartData.shoppingCartList;
+					console.log('加载'+userId+'的购物车信息'+JSON.stringify(this.cartList));
+					this.hasLogin=true
+					this.calcTotal();  //计算总价
+				}
+				
 			},
 			//监听image加载完成
 			onImageLoad(key, index) {
@@ -135,7 +139,7 @@
 					url: '/pages/public/login'
 				})
 			},
-			 //选中状态处理
+			//选中状态处理
 			check(type, index){
 				if(type === 'item'){
 					this.cartList[index].checked = !this.cartList[index].checked;
@@ -182,17 +186,18 @@
 					this.empty = true;
 					return;
 				}
-				let total = 0;
+				let totalPrice = 0;
 				let checked = true;
+				
 				list.forEach(item=>{
 					if(item.checked === true){
-						total += item.price * item.number;
+						totalPrice += item.price * item.number;
 					}else if(checked === true){
 						checked = false;
 					}
 				})
 				this.allChecked = checked;
-				this.total = Number(total.toFixed(2));
+				this.totalPrice = Number(totalPrice.toFixed(2));
 			},
 			//创建订单
 			createOrder(){
@@ -201,18 +206,57 @@
 				list.forEach(item=>{
 					if(item.checked){
 						goodsData.push({
-							attr_val: item.attr_val,
-							number: item.number
+							cartId:item.cartId,
+							shopId:item.shopId,
+							productId:item.productId,
+							skuId:item.skuId,
+							title:item.title,
+							showImg:btoa(item.showImg),
+							price:item.price,
+							number: item.number,
+							specParamVal: item.specParamVal
 						})
 					}
-				})
-
-				uni.navigateTo({
-					url: `/pages/order/createOrder?data=${JSON.stringify({
-						goodsData: goodsData
-					})}`
-				})
-				this.$api.msg('跳转下一页 sendData');
+				});
+				let param={
+					'userId':uni.getStorageSync('userId'),
+					'totalPrice': this.totalPrice,
+					'totalDiscount': this.totalDiscount,
+					'productList': goodsData
+				}
+				// console.log('预创建请求数据:' + JSON.stringify(param));
+				// 请求后台进行登录
+				uni.request({
+					url: Api.BASEURI + 'order-service/order/create',
+					method: 'POST',
+					data: param,
+					header: {
+						'content-type': 'application/json',
+					},
+					success: res => {
+						// 接口调用成功
+						console.log('预创建返回数据:' + JSON.stringify(res.data));
+						if (res.data.code == 200) {
+							let orderId=res.data.data;
+							let data=JSON.stringify({goodsData: goodsData});
+							// 创建成功
+							uni.navigateTo({
+								url: `/pages/order/createOrder?orderId=${orderId}&data=${data}`
+							})
+							this.$api.msg('跳转下一页 sendData');
+						} else {
+							uni.showToast({
+								title: res.data.message,
+								icon: 'none'
+							});
+						}
+					},
+					fail: (e) => {
+						console.log('接口' + endpoint + '请求失败:' + JSON.stringify(e));
+					},
+					complete: () => {}
+				});
+				// uni请求结束
 			}
 		}
 	}

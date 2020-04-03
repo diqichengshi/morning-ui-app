@@ -235,7 +235,7 @@
 					'queryType': 'seckill',
 					'pageNum': this.pageNum
 				};
-				let seckillDataList = await Api.apiCall('get', 'product-service/seckill/productList', seckill_param);
+				let seckillDataList = await Api.httpGet('product-service/seckill/productList', seckill_param);
 				// console.log("秒杀商品列表:"+JSON.stringify(seckillDataList));
 				this.seckillProductList = seckillDataList.records;
 				
@@ -244,17 +244,17 @@
 					'queryType': 'groupBuy',
 					'size': '2'
 				};
-				let groupBuyDataList = await Api.apiCall('get', 'product-service/groupBuy/groupBuyList', group_buy_param);
+				let groupBuyDataList = await Api.httpGet('product-service/groupBuy/groupBuyList', group_buy_param);
 				// console.log("团购商品列表:"+JSON.stringify(groupBuyDataList));
 				this.groupBuyProductList = groupBuyDataList.records;
 				
 				// 精品推荐
-				let recommendNiceDataList = await Api.apiCall('get', 'product-service/recommend/recommendList?type=0');
+				let recommendNiceDataList = await Api.httpGet('product-service/recommend/recommendList?type=0');
 				// console.log("精品推荐列表:"+JSON.stringify(recommendNiceDataList));
 				this.recommendNiceProductList = recommendNiceDataList.records;
 				
 				// 猜你喜欢
-				let recommendLikeDataList = await Api.apiCall('get', 'product-service/recommend/recommendList?type=1');
+				let recommendLikeDataList = await Api.httpGet('product-service/recommend/recommendList?type=1');
 				// console.log("猜你喜欢列表:"+JSON.stringify(recommendLikeDataList));
 				this.recommendLikeProductList = recommendLikeDataList.records;
 			},
